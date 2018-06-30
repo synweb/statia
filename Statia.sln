@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Statia", "Statia\Statia.csproj", "{FBC52B80-AD36-40C6-982F-6A3B3FABBABA}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Statia.Tests", "Statia.Tests\Statia.Tests.csproj", "{3E41B9EF-74CD-45CB-8435-66D475EAC2EF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{FBC52B80-AD36-40C6-982F-6A3B3FABBABA}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{FBC52B80-AD36-40C6-982F-6A3B3FABBABA}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{FBC52B80-AD36-40C6-982F-6A3B3FABBABA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3E41B9EF-74CD-45CB-8435-66D475EAC2EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3E41B9EF-74CD-45CB-8435-66D475EAC2EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3E41B9EF-74CD-45CB-8435-66D475EAC2EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3E41B9EF-74CD-45CB-8435-66D475EAC2EF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.ModelBinding.Internal;
+using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
@@ -37,12 +38,6 @@ namespace Statia
             return result;
         }
 
-//        private void PrintResponse(HttpContext context)
-//        {
-//            
-//        }
-
-        // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
             if (env.IsDevelopment())
@@ -51,37 +46,39 @@ namespace Statia
             }
 
             Preload();
-            app.Run(async (context) =>
-            {
-                var stopwatch = new Stopwatch();
-                stopwatch.Start();
-                var locale = GetRequestLocale(context);
-                if (locale == string.Empty)
-                {
-                    locale = null;
-                }
+            app.Run(async (context) => { await ProcessRequest(context); });
+        }
 
-                var requestUrl = context.Request.Path.Value.ToLower();
-                bool hasLocalizedFile = _urlPageCache.ContainsKey((locale, requestUrl));
-                if (hasLocalizedFile)
+        private async Task ProcessRequest(HttpContext context)
+        {
+            var stopwatch = new Stopwatch();
+            stopwatch.Start();
+            var locale = GetRequestLocale(context);
+            if (locale == string.Empty)
+            {
+                locale = null;
+            }
+
+            var requestUrl = context.Request.Path.Value.ToLower();
+            bool hasLocalizedFile = _urlPageCache.ContainsKey((locale, requestUrl));
+            if (hasLocalizedFile)
+            {
+                await WriteResponse(context, locale, requestUrl, stopwatch);
+            }
+            else
+            {
+                bool hasGlobalFile = _urlPageCache.ContainsKey((null, requestUrl));
+                if (hasGlobalFile)
                 {
-                    await WriteResponse(context, locale, requestUrl, stopwatch);
+                    await WriteResponse(context, null, requestUrl, stopwatch);
                 }
                 else
                 {
-                    bool hasGlobalFile = _urlPageCache.ContainsKey((null, requestUrl));
-                    if (hasGlobalFile)
-                    {
-                        await WriteResponse(context, null, requestUrl, stopwatch);
-                    }
-                    else
-                    {
-                        context.Response.StatusCode = 404;
-                        await context.Response.WriteAsync($"Not found. Statia server v{VERSION}.");
-                        return;
-                    }
+                    context.Response.StatusCode = 404;
+                    await context.Response.WriteAsync($"Not found. Statia server v{VERSION}.");
+                    return;
                 }
-            });
+            }
         }
 
         private async Task WriteResponse(HttpContext context, string locale, string requestUrl, Stopwatch stopwatch)
@@ -115,82 +112,23 @@ namespace Statia
 
         private string _defaultLocale = "en";
         public const string VERSION = "0.1";
-        
+
         /// <summary>
         /// [en:[relativeUrl:relativeUrl.html,...],...]
         /// </summary>
-        private Dictionary<(string,string), string> _urlPageCache = new
-            Dictionary<(string,string), string>();
-        
-        
+        private Dictionary<(string, string), string> _urlPageCache;
 
-        private void LoadPageToCache(string locale, string url, string filePath)
-        {
-            Console.WriteLine($"{locale??"default"}\t\t:\t\t{url}\t\t:\t\t{filePath}");
-            var content = File.ReadAllText(filePath);
-            _urlPageCache.Add((locale, url),  content);
-        }
-
-        private void PreloadFolderRecursively(string path, string relativePathPrefix)
-        {
-            Console.WriteLine($"Going into {path}");
-            var files = Directory.EnumerateFiles(path).ToArray();
-            if (files.Length == 0)
-            {
-                return;
-            }
-            var filePaths = files.Select(x =>
-                new
-                {
-                    FilePath = x,
-                    Match = Regex.Match(x.Substring(Program.RootDirectory.Length), @"(\w+)(\.\w{0,2})?(\.\w+)$") // getting filename
-                }).Where(x => x.Match.Success).ToList();
-            foreach (var pair in filePaths)
-            {
-                var isHtml = pair.Match.Groups[3].Value.Equals(".html");
-                string relativeUrl;
-                if (isHtml)
-                {
-                    // filename without extension
-                    var filenameWithoutExt = pair.Match.Groups[1].Value;
-                    relativeUrl = filenameWithoutExt == "index" ? relativePathPrefix : $"{relativePathPrefix}{filenameWithoutExt}"; 
-                }
-                else
-                {
-                    // full file name
-                    relativeUrl = $"{relativePathPrefix}{pair.Match.Value}";
-                }
-
-                
-                var locale = pair.Match.Groups[2].Value;
-                locale = string.IsNullOrEmpty(locale) ? null : locale.Substring(1); // dot is the first symbol
-
-                LoadPageToCache(locale, relativeUrl, pair.FilePath);
-            }
-            var dirs = Directory.EnumerateDirectories(path).Where(x => !x.StartsWith("."));
-            foreach (var dir in dirs)
-            {
-                var childPrefix =
-                    $"{relativePathPrefix}{dir.Split(new[] {'/', '\\'}, StringSplitOptions.RemoveEmptyEntries).Last()}/";
-                PreloadFolderRecursively(dir, childPrefix);
-            }
-        }
+        private Loader _loader;
         
         private void Preload()
         {
             var sw = new Stopwatch();
             sw.Start();
             Console.WriteLine("Loading pages:");
-            PreloadFolderRecursively(Program.RootDirectory, "/");
+            _loader = new Loader(Program.RootDirectory);
+            _urlPageCache = _loader.Load();
             sw.Stop();
             Console.WriteLine($"Loaded in {sw.ElapsedMilliseconds} ms");
-//            var indexFilename = "index.html";
-//            var indexPath = Path.Combine(_contentDir, indexFilename);
-//            if (File.Exists(indexPath))
-//            {
-//                LoadPageToCache(null, "/", indexPath);
-//            }
-            
             
         }
     }
