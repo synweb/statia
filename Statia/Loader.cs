@@ -14,23 +14,23 @@ namespace Statia
             _contentRoot = contentRoot;
         }
         private static readonly Logger _logger = LogManager.GetCurrentClassLogger();
+
         /// <summary>
         /// [en:[relativeUrl:relativeUrl.html,...],...]
         /// </summary>
-        private readonly Dictionary<(string,string), string> _urlPageCache = new
-            Dictionary<(string,string), string>();
+        private readonly PageCache _urlPageCache = new PageCache();
 
         private readonly string _contentRoot;
 
         private void LoadFile(string filePath)
         {
             var localeUrlPair = GetLocaleAndRelativeUrl(filePath);
-            LoadPageToCache(localeUrlPair.Item1, localeUrlPair.Item2, filePath);
+            AddPageToCache(localeUrlPair.Item1, localeUrlPair.Item2, filePath);
         }
         
         private void PreloadFolderRecursively(string path, string relativePathPrefix)
         {
-            var files = Directory.EnumerateFiles(path).ToArray();
+            var files = Directory.EnumerateFiles(path, "*.html").ToArray();
             if (files.Length == 0)
             {
                 return;
@@ -53,10 +53,14 @@ namespace Statia
             return fullPath.Split(new[] {'/', '\\'}, StringSplitOptions.RemoveEmptyEntries).Last();
         }
 
-        private void LoadPageToCache(string locale, string url, string filePath)
+        private void AddPageToCache(string locale, string url, string filePath)
         {
             Console.WriteLine($"{locale??"default"}\t\t:\t\t{url}\t\t:\t\t{filePath}");
             var content = File.ReadAllText(filePath);
+            if (_urlPageCache.ContainsKey((locale, url)))
+            {
+                _urlPageCache.Remove((locale, url));
+            }
             _urlPageCache.Add((locale, url),  content);
         }
         
@@ -89,7 +93,7 @@ namespace Statia
             return (locale, relativeUrl);
         }
 
-        public Dictionary<(string, string), string> Load()
+        public PageCache Load()
         {
             PreloadFolderRecursively(_contentRoot, "/");
             SetupWatcher(_contentRoot);
@@ -98,12 +102,19 @@ namespace Statia
 
         private void SetupWatcher(string rootDirectory)
         {
-            var fw = new FileSystemWatcher(Program.RootDirectory);
+            var fw = new FileSystemWatcher(Program.RootDirectory, "*.html");
             fw.Created += WatcherEvent;
             fw.Deleted += WatcherEvent;
             fw.Renamed += WatcherEvent;
             fw.Changed += WatcherEvent;
+            fw.IncludeSubdirectories = true;
             fw.EnableRaisingEvents = true;
+        }
+
+        private void UnloadFile(string pagePath)
+        {
+            var localeUrlPair = GetLocaleAndRelativeUrl(pagePath);
+            _urlPageCache.Remove(localeUrlPair);
         }
 
         private void WatcherEvent(object sender, FileSystemEventArgs e)
@@ -117,7 +128,17 @@ namespace Statia
             _logger.Trace($"{relativePath} {e.ChangeType}");
             switch (e.ChangeType)
             {
+                case WatcherChangeTypes.Renamed:
+                    var renamedEventArgs = (RenamedEventArgs) e;
+                    UnloadFile(renamedEventArgs.OldFullPath);
+                    LoadFile(renamedEventArgs.FullPath);
+                    break;
                 case WatcherChangeTypes.Deleted:
+                    UnloadFile(e.FullPath);
+                    break;
+                case WatcherChangeTypes.Created:
+                case WatcherChangeTypes.Changed:
+                    LoadFile(e.FullPath);
                     break;
             }
             

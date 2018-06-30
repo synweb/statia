@@ -16,9 +16,10 @@ namespace Statia
         private static int _port = 57471;
 
         public static string RootDirectory { get; private set; }
+        public static string Version = "0.1";
         
         /// <summary>
-        /// using: satia /var/www/html
+        /// using: satia /var/www/html -p 8080
         /// </summary>
         /// <param name="args"></param>
         public static void Main(string[] args)
