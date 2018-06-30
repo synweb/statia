@@ -13,7 +13,8 @@ namespace Statia
 {
     public class Program
     {
-        
+        private static int _port = 57471;
+
         public static string RootDirectory { get; private set; }
         
         /// <summary>
@@ -31,6 +32,20 @@ namespace Statia
             {
                 RootDirectory = defaultRootDir;
             }
+            
+            for(int i = 0; i < args.Length; i++)
+            {
+                string arg = args[i];
+                switch (arg)
+                {
+                        case "-p":
+                        case "--port":
+                            string portArg = args[i + 1];
+                            _port = int.Parse(portArg);
+                            break;
+                }
+                
+            }
             CreateWebHostBuilder(args)
                 .Build()
                 .Run();
@@ -45,6 +60,7 @@ namespace Statia
                     logging.ClearProviders();
                     logging.SetMinimumLevel(Microsoft.Extensions.Logging.LogLevel.Trace);
                 })
+                .UseUrls($"http://localhost:{_port}")
                 .UseNLog();
     }
 }
