@@ -41,7 +41,6 @@ namespace Statia
             // returns http status code
             AddCacheHeaders(context);
             string requestUrl = (string) context.Items["requestUrl"];
-            var stopwatch = (Stopwatch) context.Items["stopwatch"];
             if (Regex.IsMatch(requestUrl, @"index\..+\.html"))
             {
                 return 404;
@@ -53,22 +52,31 @@ namespace Statia
             }
 
             var pageCache = (PageCache) context.Items["pages"];
+            string finalLocale;
             bool hasLocalizedFile = pageCache.ContainsKey((locale, requestUrl));
             if (hasLocalizedFile)
             {
-                var code = await WriteContentResponse(context, locale, requestUrl, stopwatch);
+                var code = await WriteContentResponse(context, locale, requestUrl);
                 return code;
             }
             bool hasGlobalFile = pageCache.ContainsKey((null, requestUrl));
             if (hasGlobalFile)
             {
-                var code = await WriteContentResponse(context, null, requestUrl, stopwatch);
+                var code = await WriteContentResponse(context, null, requestUrl);
+                return code;
+            }
+            bool hasDefaultLocaleFile = pageCache.ContainsKey((_defaultLocale, requestUrl));
+            if (hasDefaultLocaleFile)
+            {
+                var code = await WriteContentResponse(context, _defaultLocale, requestUrl);
                 return code;
             }
             return null;
         }
 
-        private async Task<int> WriteContentResponse(HttpContext context, string locale, string requestUrl, Stopwatch stopwatch)
+        private string _defaultLocale = "en";
+
+        private async Task<int> WriteContentResponse(HttpContext context, string locale, string requestUrl)
         {
             var pageCache = (PageCache) context.Items["pages"];
             int code;
