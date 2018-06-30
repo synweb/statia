@@ -40,14 +40,8 @@ namespace Statia
         {
             // returns http status code
             AddCacheHeaders(context);
-            var stopwatch = new Stopwatch();
-            stopwatch.Start();
-            var requestUrl = context.Request.Path.Value.ToLower();
-            if (requestUrl.Length > 1 && requestUrl.EndsWith('/'))
-            {
-                requestUrl = requestUrl.Substring(0, requestUrl.Length - 1);
-            }
-
+            string requestUrl = (string) context.Items["requestUrl"];
+            var stopwatch = (Stopwatch) context.Items["stopwatch"];
             if (Regex.IsMatch(requestUrl, @"index\..+\.html"))
             {
                 return 404;
@@ -62,41 +56,34 @@ namespace Statia
             bool hasLocalizedFile = pageCache.ContainsKey((locale, requestUrl));
             if (hasLocalizedFile)
             {
-                var code = await WriteResponse(context, locale, requestUrl, stopwatch);
+                var code = await WriteContentResponse(context, locale, requestUrl, stopwatch);
                 return code;
             }
             bool hasGlobalFile = pageCache.ContainsKey((null, requestUrl));
             if (hasGlobalFile)
             {
-                var code = await WriteResponse(context, null, requestUrl, stopwatch);
+                var code = await WriteContentResponse(context, null, requestUrl, stopwatch);
                 return code;
             }
             return null;
         }
 
-        private async Task<int> WriteResponse(HttpContext context, string locale, string requestUrl, Stopwatch stopwatch)
+        private async Task<int> WriteContentResponse(HttpContext context, string locale, string requestUrl, Stopwatch stopwatch)
         {
             var pageCache = (PageCache) context.Items["pages"];
-            int responseStatusCode;
-            long time;
+            int code;
             try
             {
-                responseStatusCode = 200;
+                code = 200;
                 var responseText = pageCache[(locale, requestUrl)];
-                time = stopwatch.ElapsedMilliseconds;
                 await context.Response.WriteAsync(responseText);
             }
             catch (Exception e)
             {
+                code = 500;
                 _logger.Error(e);
-                responseStatusCode = 500;
-                time = stopwatch.ElapsedMilliseconds;
             }
-            stopwatch.Stop();
-            string logMsg =
-                $"{context.Connection.RemoteIpAddress}:{context.Connection.RemotePort}\t\t{responseStatusCode}\t\t{requestUrl}\t\t{time} ms";
-            _logger.Info(logMsg);
-            return responseStatusCode;
+            return code;
         }
     }
 }

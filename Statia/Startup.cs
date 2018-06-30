@@ -33,12 +33,25 @@ namespace Statia
             services.AddSpaStaticFiles(opt => { opt.RootPath = Program.RootDirectory; });
         }
 
+        private readonly string _responseServerHeader = $"Statia {Program.Version}";
+
         public void Configure(IApplicationBuilder app, IHostingEnvironment env)
         {
             Preload();
             app.Use(async (context, next) =>
             {
+                
+                var stopwatch = new Stopwatch();
+                stopwatch.Start();
+                var requestUrl = context.Request.Path.Value.ToLower();
+                if (requestUrl.Length > 1 && requestUrl.EndsWith('/'))
+                {
+                    requestUrl = requestUrl.Substring(0, requestUrl.Length - 1);
+                }
+                context.Response.Headers[HeaderNames.Server] = _responseServerHeader;
                 context.Items["pages"] = _urlPageCache;
+                context.Items["stopwatch"] = stopwatch;
+                context.Items["requestUrl"] = requestUrl;
                 var code = await _requestProcessor.ProcessRequest(context);
                 if (code.HasValue)
                 {
@@ -53,6 +66,13 @@ namespace Statia
                 {
                     await next.Invoke();
                 }
+                stopwatch.Stop();
+                if (code == null)
+                {
+                    code = context.Response.StatusCode;
+                }
+                string logMsg = $"{context.Connection.RemoteIpAddress}:{context.Connection.RemotePort}\t{requestUrl}\t{stopwatch.Elapsed.TotalMilliseconds:0.000} ms\t{code}";
+                _logger.Info(logMsg);
             });
             app.UseStaticFiles(new StaticFileOptions()
             {
@@ -66,16 +86,15 @@ namespace Statia
             app.Run(async (context) =>
             {
                 var item = context.Items["code"];
-                if (item == null)
+                var code = (int?) item ?? 404;
+                context.Response.StatusCode = code;
+                if (code == 404)
                 {
                     await _requestProcessor.WriteNotFoundResponse(context);
-                    return;
                 }
-                int code = (int) item;
-                context.Response.StatusCode = code;
-                if (code==404)
-                {
-                }
+                //string requestUrl = (string) context.Items["requestUrl"];
+                //var stopwatch = (Stopwatch) context.Items["stopwatch"];
+                
             });
         }
         
